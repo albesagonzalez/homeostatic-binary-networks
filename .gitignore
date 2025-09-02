@@ -1,0 +1,30 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-wheel-metadata/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Builds and logs
+dist/
+build/
+*.egg-info/
+
+# Editors/IDE
+.vscode/
+.idea/
+
+# Misc
+.env
+*.log
