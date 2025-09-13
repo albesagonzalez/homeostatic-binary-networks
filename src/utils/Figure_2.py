@@ -11,8 +11,8 @@ from src.utils.general import make_input, get_selectivity, get_latent_accuracy, 
 
 
 from src.model import SSCNetwork
-from Network_Definition.forward import forward
-from Network_Definition.parameters import network_parameters
+from network_model.forward import forward
+from params.default import network_parameters
 from src.utils.general import make_input, LatentSpace, get_ordered_indices, test_network, get_latent_accuracy
 
 
@@ -51,6 +51,10 @@ def figure2_accuracy(
           - accuracy_vector: (L,) per-latent accuracies (torch.float32)
           - aux: dict with intermediate tensors for inspection (X, labels, selectivity)
     """
+
+
+    print("Starting Figure 2 recall - seed{}, noise_in{}, noise_rec{}".format(seed, noise_level))
+
     if seed is not None:
         seed_everything(seed)
 
