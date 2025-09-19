@@ -53,7 +53,7 @@ def figure2_accuracy(
     """
 
 
-    print("Starting Figure 2 recall - seed{}, noise_in{}, noise_rec{}".format(seed, noise_level))
+    print("Starting Figure 2 recall - seed {}, noise {}".format(seed, noise_level))
 
     if seed is not None:
         seed_everything(seed)

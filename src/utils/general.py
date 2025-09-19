@@ -320,12 +320,53 @@ def get_cos_sim_np(x1, x2):
   return np.dot(x1, x2)/(np.linalg.norm(x1)*np.linalg.norm(x2))
 
 
-def get_signal_to_noise_ratio(num_swaps, K, N):
-  #signal = overlap with original - overlap with random
-  signal = (K - num_swaps) - K**2/N
-  #noise is average (actually always the same) distance with mean (the oriignal pattern)
-  noise = 2*num_swaps
-  #snr is signal to noise ratio (signal/noise)
-  snr = signal/noise
-  return snr
+def get_signal_to_noise_ratio(num_swaps, network):
+
+  snr_list = []
+  for subregion_index in range(network.hidden_num_subregions):
+
+    N = network.hidden_size_subregions[subregion_index]
+    K = network.hidden_size_subregions[subregion_index]*network.hidden_sparsity[subregion_index]
+    num_swaps_region = torch.round(num_swaps * N / network.hidden_size)
+
+    #signal = overlap with original - overlap with random
+    signal = (K - num_swaps_region) - K**2/N
+    #noise is average (actually always the same) distance with mean (the oriignal pattern)
+    noise = 2*num_swaps_region
+    #snr is signal to noise ratio (signal/noise)
+    snr = (signal/noise)**2
+
+    snr_list.append(snr)
+
+
+  return np.mean(snr_list)
+
+
+
+def get_cond_matrix(latent_space, weights, eta):
+  num_subs = len(latent_space.sub_index_to_neuron_index)
+  sim_cond_matrix = np.zeros((num_subs, num_subs))
+  th_cond_matrix = np.zeros((num_subs, num_subs))
+  for conditioned_sub_index, ((conditioned_latent, conditioned_sub), conditioned_neuron_index) in enumerate(zip(latent_space.sub_index_to_latent_sub, latent_space.sub_index_to_neuron_index)):
+    for condition_sub_index, ((condition_latent, condition_sub), condition_neuron_index) in  enumerate(zip(latent_space.sub_index_to_latent_sub, latent_space.sub_index_to_neuron_index)):
+      if conditioned_sub != condition_sub:
+        sim_cond_matrix[conditioned_sub_index][condition_sub_index] = np.mean(weights[conditioned_neuron_index][:, condition_neuron_index])
+      else:
+        #sim_cond_matrix[conditioned_sub_index][condition_sub_index] = np.mean(weights[conditioned_neuron_index][:, condition_neuron_index][~np.eye(condition_neuron_index.shape[0], dtype=bool)])
+        sim_cond_matrix[conditioned_sub_index][condition_sub_index] = np.mean(weights[conditioned_neuron_index][:, condition_neuron_index])
+      if conditioned_latent != condition_latent:
+        label = [0, 0]
+        label[conditioned_latent] = conditioned_sub
+        label[condition_latent] = condition_sub
+        try:
+          th_cond_matrix[conditioned_sub_index][condition_sub_index] = latent_space.label_to_probs[tuple(label)]/(eta*latent_space.sub_index_to_marginal[condition_sub_index] + (1 - eta)*latent_space.sub_index_to_marginal[conditioned_sub_index])
+        except:
+          th_cond_matrix[conditioned_sub_index][condition_sub_index] = 0
+
+      elif conditioned_sub == condition_sub:
+        th_cond_matrix[conditioned_sub_index][condition_sub_index] = 1
+
+      else:
+        th_cond_matrix[conditioned_sub_index][condition_sub_index] = 0
+  return sim_cond_matrix, th_cond_matrix
 

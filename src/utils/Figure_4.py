@@ -11,10 +11,7 @@ from src.utils.general import make_input, get_selectivity, get_latent_accuracy, 
 
 
 from src.model import SSCNetwork
-from Network_Definition.forward import forward
-from Network_Definition.parameters import network_parameters
-from src.utils.general import make_input, LatentSpace, get_ordered_indices, test_network, get_latent_accuracy
-
+from src.utils.general import make_input, get_selectivity, get_latent_accuracy, LatentSpace, get_sample_from_num_swaps, get_cos_sim_torch
 
 def seed_everything(seed: int = 42) -> None:
     random.seed(seed)
@@ -90,8 +87,8 @@ def figure4_accuracy(
 
     
     input_params = {}
-    input_params["num_days"] = 100
-    input_params["day_length"] = 40
+    input_params["num_days"] = 1
+    input_params["day_length"] = 1000
     input_params["mean_duration"] = 5
     input_params["fixed_duration"] = True
     input_params["num_swaps"] = noise_level_test

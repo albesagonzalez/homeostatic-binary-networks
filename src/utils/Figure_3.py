@@ -9,13 +9,6 @@ from src.model import SSCNetwork
 from src.utils.general import make_input, get_selectivity, get_latent_accuracy, LatentSpace, get_sample_from_num_swaps, get_cos_sim_torch
 
 
-
-from src.model import SSCNetwork
-from Network_Definition.forward import forward
-from Network_Definition.parameters import network_parameters
-from src.utils.general import make_input, LatentSpace, get_ordered_indices, test_network, get_latent_accuracy
-
-
 def seed_everything(seed: int = 42) -> None:
     random.seed(seed)
     np.random.seed(seed)
@@ -29,8 +22,8 @@ def figure3_recall(
     input_parameters: Dict[str, Any],
     latent_specs: Optional[Dict[str, Any]] = None,
     num_episodes: Optional[int] = None,
-    noise_level_recall: Optional[int] = None,
     noise_level_input: Optional[int] = None,
+    noise_level_recall: Optional[int] = None,
     seed: Optional[int] = None,
     eval_region: str = "output",
     get_aux_results : bool = False,
@@ -83,7 +76,7 @@ def figure3_recall(
     net = SSCNetwork(network_parameters, rec_params, model)
 
     # Generate input
-    input_tensor, input_episodes, input_latents = make_input(**in_params)
+    input_tensor, input_episodes, input_latents = make_input(**in_params, regions=net.hidden_subregions)
 
     # Run days
     with torch.no_grad():
@@ -95,7 +88,7 @@ def figure3_recall(
     in_params["day_length"] = 100
     in_params["num_swaps"] = 0
 
-    input_tensor, input_episodes, input_latents = make_input(**in_params)
+    input_tensor, input_episodes, input_latents = make_input(**in_params, regions=net.hidden_subregions)
     X_input = input_tensor.flatten(end_dim=1)
     recalls = torch.zeros(X_input.shape[1])
 

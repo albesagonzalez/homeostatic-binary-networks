@@ -1,0 +1,447 @@
+\documentclass{article}
+\usepackage{hyperref}
+\hypersetup{
+    urlcolor=blue,
+    citecolor=blue,
+    colorlinks=true
+%    colorlinks=true
+}
+
+%    filecolor=magenta,      
+%    urlcolor=cyan,
+%    pdftitle={Overleaf Example},
+%    pdfpagemode=FullScreen,
+%    }
+\usepackage{comment}
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{cancel}
+\usepackage{amsfonts} 
+\usepackage{textcomp}
+\usepackage{amssymb}
+\usepackage{subfig}
+\usepackage{caption}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{cancel}
+\usepackage{booktabs}
+\usepackage{lipsum}
+\usepackage{enumerate}
+\usepackage{authblk}
+\usepackage{makecell}
+\usepackage[a4paper, total={6.5in, 9.5in}]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[]{apacite}
+\bibliographystyle{apacite}
+\usepackage{lineno}
+\usepackage{xcolor}
+\linenumbers
+\DeclareMathOperator*{\argminA}{arg\,min} 
+\title{Homeostatic Binary Networks: \\ A simple framework for learning with overlapping patterns}
+%\title{Extracting semantics for episodic memory in Complementary Learning Systems}
+\author[1]{Albert Albesa-González}
+\author[1]{Claudia Clopath} 
+\affil[1]{Department of Bioengineering, Imperial College London, London, UK}
+\begin{document}
+\section*{Methods}\label{methods}
+\subsection*{Circuit Model}
+\subsubsection*{Architecture and nomenclature}
+\paragraph*{Regions and neural activity}
+The circuit model contains 2 main regions: hidden, and output. In turn, hidden layer is split into two sub-regions: ($A$ and $B$). We use $X$ to denote the neural activity, which is written as $X^\textrm{region}$ (for example $X^\textrm{hidden}$) when the region is to be made explicit. The same follows for pre-activation (synaptic) input, which is denoted by $\hat{X}$ (or $\hat{X}^\textrm{region})$. The activity of neuron $i$ in a region is $X^\textrm{region}_i$. The number of neurons in a region is denoted by $N^\textrm{region}$ (e.g. $N^\textrm{hidden}$).
+\paragraph{Connectivity}
+Connectivity matrices connecting a region \textrm{pre} to a region \textrm{post} take the form $W^{\textrm{post}\leftarrow\textrm{pre}}$, and a synapse connecting neuron $j$ in region pre with neuron $i$ in region post is $W^{\textrm{post}\leftarrow\textrm{pre}}_{ij}$. For example, $W^{\textrm{output}\leftarrow\textrm{hidden}}_{13}$ represents the connection from neuron 3 in hidden to neuron 1 in output. Connectivity is classified as either feed-forward (connecting two different regions), which corresponds to  $W^{\textrm{output}\leftarrow\textrm{hidden}}$, and recurrent (connecting a region with itself), which corresponds to $W^{\textrm{hidden}\leftarrow\textrm{hidden}}$. Given a connectivity matrix $W^{\textrm{post}\leftarrow\textrm{pre}}$, we call receptive field of a postsynaptic neuron $i$ $\textrm{RF}^{\textrm{post}\leftarrow\textrm{pre}}_i$ the vector representing the connections from region pre to postsynaptic neuron $i$
+\begin{equation}
+    \textrm{RF}^{\textrm{post}\leftarrow\textrm{pre}}_i = \{{W^{\textrm{post}\leftarrow\textrm{pre}}}_{kj}\} \;\; : \;k = i 
+\end{equation}
+\paragraph{Feed-Forward connectivity initialization}
+Feed-forward connections are initially sampled from a Gaussian distribution with mean 0 and standard deviation $W^{\textrm{post}\leftarrow\textrm{pre}}_\sigma$ as a network parameter.
+\begin{equation}
+    W^{\textrm{post}\leftarrow\textrm{pre}}_{ij} \sim \mathcal{N}(0, W^{\textrm{post}\leftarrow\textrm{pre}}_\sigma)
+\end{equation}
+\paragraph{Recurrent connectivity initialization}
+In Fig. \ref{fig:recurrent}, $W^{\textrm{hidden}\leftarrow\textrm{hidden}}$ is initialized randomly with the condition that the sum of the outgoing weights (in the case of outgoing homeostasis) or incoming weights (in the case of incoming homeostasis), matches the maximum allowed by $W^{\textrm{hidden}\leftarrow\textrm{hidden}}_\textrm{max-out}$ and $W^{\textrm{hidden}\leftarrow\textrm{hidden}}_\textrm{max-in}$ (respectively). We describe how this is done in the case of incoming homeostasis, which can be extended to outgoing homeostasis by taking the transpose of such initialization. First, we think of recurrent connections as feed-forward from hidden to hidden, and then impose in the corresponding receptive fields a specific size:
+\begin{equation}
+    || RF_i ||_0 = |\{j \in \{1, ..., N^\textrm{hidden}\} : W^{\textrm{hidden}\leftarrow\textrm{hidden}}_{ij} \neq 0\}| = W^{\textrm{hidden}\leftarrow\textrm{hidden}}_\textrm{size}\;\; \forall i
+\end{equation}
+and sum:
+\begin{equation}
+    \sum_j\{RF_i^{\textrm{hidden}\leftarrow\textrm{hidden}}\}_j = \sum_jW^{\textrm{hidden}\leftarrow\textrm{hidden}}_{ij} = W^{\textrm{hidden}\leftarrow\textrm{hidden}}_\textrm{max-in}\;\; \forall i
+\end{equation}
+where $|| RF_i ||_0$ denotes the $l_0$ norm (which counts the number of non-zero entries), $W^{\textrm{hidden}\leftarrow\textrm{hidden}}_\textrm{size}$ is a network parameter determining the number of non-zero incoming connections at every neuron, and $W^{\textrm{hidden}\leftarrow\textrm{hidden}}_\textrm{max-in}$ another network parameter determining the maximum sum of incoming connections a postsynaptic neuron has. In order to achieve both conditions, we generate $W^{\textrm{hidden}\leftarrow\textrm{hidden}}$ by randomly sampling each receptive field $i$ independently, following:
+\begin{equation}
+    \{RF_i\}_j =
+\begin{cases}
+\frac{W^{\textrm{hidden}\leftarrow\textrm{hidden}}_\textrm{max-in}}{W^{\textrm{hidden}\leftarrow\textrm{hidden}}_\textrm{size}}, & \text{if } j \in S, \\
+0, & \text{if } j \notin S,
+\end{cases}
+\end{equation}
+with $S$ a random subset of the presynaptic entries:
+\begin{equation} 
+S \sim \text{Unif}\big\{ T \subseteq \{1,\dots,N^\textrm{hidden}\} : |T| = W^{\textrm{hidden}\leftarrow\textrm{hidden}}_\textrm{size} \big\} \Longrightarrow  |S| = W^{\textrm{hidden}\leftarrow\textrm{hidden}}_\textrm{size} 
+
+\begin{table}[ht]
+\centering
+\caption{Default model parameters}
+\label{tab:model_default}
+\begin{tabular}{lll}
+\toprule
+\textbf{Variable} & \textbf{Description} & \textbf{Value} \\
+\midrule
+$N^{\textrm{hidden}}$ & Hidden neurons (total) & 100 \\
+$N^{\textrm{output}}$ & Output neurons (total) & 100 \\
+$K^{\textrm{hidden}}$ & Active hidden neurons per step & $0.2\,N^{\textrm{hidden}}=20$ \\
+$K^{\textrm{output}}$ & Active output neurons per step & $\tfrac{4}{100}\,N^{\textrm{output}}=4$ \\
+$W^{\textrm{hidden}\leftarrow\textrm{hidden}}_{\textrm{size}}$ & Recurrent RF size (incoming) & 30 \\
+$W^{\textrm{hidden}\leftarrow\textrm{hidden}}_{\textrm{max-in}}$ & Max incoming sum per neuron & $\infty$ \\
+$W^{\textrm{hidden}\leftarrow\textrm{hidden}}_{\textrm{max-out}}$ & Max outgoing sum per neuron & 1 \\
+$\lambda^{\textrm{hidden}\leftarrow\textrm{hidden}}$ & Recurrent learning rate & $5\times10^{-4}$ \\
+$W^{\textrm{output}\leftarrow\textrm{hidden}}_{\textrm{size}}$ & Feed-forward RF size & 10 \\
+$\sigma^{\textrm{output}\leftarrow\textrm{hidden}}$ & Feed-forward init noise std & 0.005 \\
+$W^{\textrm{output}\leftarrow\textrm{hidden}}_{\textrm{max-in}}$ & Max incoming sum per neuron & 1 \\
+$W^{\textrm{output}\leftarrow\textrm{hidden}}_{\textrm{max-out}}$ & Max outgoing sum per neuron & $\infty$ \\
+$\lambda^{\textrm{output}\leftarrow\textrm{hidden}}_{\textrm{slow}}$ & Feed-forward slow learning rate & $5\times10^{-4}$ \\
+$b^{\textrm{output}}$ & Extra excitability of immature neurons & 0.7 \\
+$\textrm{IM}^{\textrm{output}}$ & Initial immaturity (indicator) & 1 \\
+$\textrm{iter}^{\textrm{hidden}}_{\textrm{pc}}$ & Pattern-complete iterations in hidden & 10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph*{Figure 3 setup}
+To reproduce Figure~3, we change the hidden architecture and run recall sweeps. Only additions/differences vs. previous tables are listed; unchanged defaults are omitted.
+
+\begin{table}[ht]
+\centering
+\caption{Figure 3: Model parameters (additions/differences)}
+\label{tab:fig3_model}
+\begin{tabular}{lll}
+\toprule
+\textbf{Variable} & \textbf{Description} & \textbf{Value} \\
+\midrule
+\texttt{hidden\_num\_subregions} & Hidden subregions & \texttt{2} \\
+\texttt{hidden\_size\_subregions} & Hidden subregion sizes & \texttt{[50, 100]} \\
+\texttt{hidden\_sparsity} & Active frac per subregion & \texttt{[10/50, 10/100]} \\
+\texttt{hidden\_sparsity\_sleep} & Sleep sparsity & \texttt{[10/50, 10/100]} \\
+\texttt{hidden\_hidden\_lmbda} & Recurrent learning rate & \texttt{5e-5} \\
+\texttt{frozen} & Train plastic connections & \texttt{False} \\
+\texttt{recording.rate\_connectivity} & Connectivity recording rate & \texttt{1} \\
+\texttt{hidden\_hidden homeostasis} & Constraint mode & \makecell[l]{Outgoing: \texttt{max\_pre=1}, \texttt{max\_post=\(\infty\)}, \\\texttt{init\_random\_max=pre}, \texttt{init\_max\_pre=1} \\ Incoming: \texttt{max\_post=1}, \texttt{max\_pre=\(\infty\)}, \\\texttt{init\_random\_max=post}, \texttt{init\_max\_post=1}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph*{Figure 4 setup}
+To reproduce Figure~4 (replay + downstream readout), we introduce sleep replay and adjust hidden architecture. Only additions/differences vs. previous tables are listed.
+
+\begin{table}[ht]
+\centering
+\caption{Figure 4: Model parameters (additions/differences)}
+\label{tab:fig4_model}
+\begin{tabular}{lll}
+\toprule
+\textbf{Variable} & \textbf{Description} & \textbf{Value} \\
+\midrule
+\texttt{sleep\_duration} & Replay timesteps during sleep & \texttt{5000} \\
+\texttt{hidden\_num\_subregions} & Hidden subregions & \texttt{2} \\
+\texttt{hidden\_size\_subregions} & Hidden subregion sizes & \texttt{[50, 50]} \\
+\texttt{hidden\_sparsity} & Active frac per subregion & \texttt{[10/50, 10/50]} \\
+\texttt{hidden\_sparsity\_sleep} & Sleep sparsity & \texttt{[10/50, 10/50]} \\
+\texttt{hidden\_hidden\_lmbda} & Recurrent learning rate & \texttt{5e-5} \\
+\texttt{frozen} & Train plastic connections & \texttt{False} \\
+\texttt{recording.regions} & Recorded regions & \texttt{[hidden, output\_hat, output]} \\
+\texttt{recording.connections} & Recorded connections & \texttt{[output\_hidden]} \\
+\texttt{recording.rate\_activity} & Activity recording rate & \texttt{1} \\
+\texttt{recording.rate\_connectivity} & Connectivity recording rate & \texttt{1} \\
+\texttt{assembly\_size} & Output assembly size (viz) & \texttt{4} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Figure 4: Input parameters}
+\label{tab:fig4_input}
+\begin{tabular}{lll}
+\toprule
+\textbf{Variable} & \textbf{Description} & \textbf{Value} \\
+\midrule
+\texttt{num\_days} (train) & Days of experience (pre-sleep) & \texttt{1} \\
+\texttt{day\_length} (train) & Timesteps per day (pre-sleep) & \texttt{25000} \\
+\texttt{mean\_duration} & Mean episode duration & \texttt{5} (\texttt{fixed\_duration = True}) \\
+\texttt{num\_swaps} (train) & Corruption during storage & \texttt{4} \\
+\texttt{latent.num} & Number of latents & \texttt{2} \\
+\texttt{latent.total\_sizes} & Size per latent subspace & \texttt{[50, 50]} \\
+\texttt{latent.act\_sizes} & Active per latent (K-hot) & \texttt{[10, 10]} \\
+\texttt{latent.dims} & Categories per latent & \texttt{[5, 5]} \\
+\texttt{latent.prob\_list} & Joint distribution & $P(A{=}i,B{=}j){=}0.1$ if $i{=}j$, else $0.025$ \\
+\texttt{sleep} & Apply replay after training & \texttt{Yes} (\texttt{sleep\_duration}=5000) \\
+\texttt{num\_days} (test) & Days of experience (post-sleep) & \texttt{[viz: 200], [sweep: 100]} \\
+\texttt{day\_length} (test) & Timesteps per day (post-sleep) & \texttt{40} \\
+\texttt{num\_swaps\_train} & Noise sweep (stored) & \texttt{[0,2,4,6,8,10,12,14,16]} \\
+\texttt{num\_swaps\_test} & Noise sweep (presented) & \texttt{[0,2,4,6,8,10,12,14,16]} \\
+\texttt{seeds} & Random seeds & \texttt{[0]} (\texttt{num\_seeds}=1) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Figure 3: Input parameters}
+\label{tab:fig3_input}
+\begin{tabular}{lll}
+\toprule
+\textbf{Variable} & \textbf{Description} & \textbf{Value} \\
+\midrule
+\texttt{num\_days} & Days of experience & \texttt{1} \\
+\texttt{day\_length} & Timesteps per day & \texttt{25000} \\
+\texttt{mean\_duration} & Mean episode duration & \texttt{5} (\texttt{fixed\_duration = True}) \\
+\texttt{num\_episodes} & Episodes presented (derived) & \texttt{5000} \\
+\texttt{num\_swaps\_train} & Corruption during storage & \texttt{[0, 4, 8, 12, 16, 20, 24]} \\
+\texttt{num\_swaps\_recall} & Corruption at recall & \texttt{[0, 4, 8, 12, 16, 20, 24]} \\
+\texttt{latent.num} & Number of latents & \texttt{2} \\
+\texttt{latent.total\_sizes} & Size per latent subspace & \texttt{[50, 100]} \\
+\texttt{latent.act\_sizes} & Active per latent (K-hot) & \texttt{[10, 10]} \\
+\texttt{latent.dims} & Categories per latent & \texttt{[5, 10]} \\
+\texttt{latent.prob\_list} & Joint distribution & $P(A{=}i,B{=}j)=\tfrac{1}{50}$ if $\lfloor j/2\rfloor{=}i$, else $0$ \\
+\texttt{seeds} & Random seeds & \texttt{[0]} (\texttt{num\_seeds}=1) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph*{Figure 2 setup}
+To reproduce Figure~2 panels (B1--F), we use the following parameters in addition to the defaults above. Parameters already listed in Table~\ref{tab:model_default} are omitted unless changed.
+
+\begin{table}[ht]
+\centering
+\caption{Figure 2: Model parameters (additions/differences)}
+\label{tab:fig2_model}
+\begin{tabular}{lll}
+\toprule
+\textbf{Variable} & \textbf{Description} & \textbf{Value} \\
+\midrule
+\texttt{recording.regions} & Recorded activity regions & \texttt{[hidden, output\_hat, output]} \\
+\texttt{recording.rate\_activity} & Activity recording rate & \texttt{1} \\
+\texttt{recording.connections} & Recorded connections & \texttt{[hidden\_hidden]} \\
+\texttt{recording.rate\_connectivity} & Connectivity recording rate & \texttt{100} \\
+\texttt{eval\_region} & Region evaluated for accuracy & \texttt{output} \\
+\texttt{assembly\_size} & Neurons per episode assembly (ordering) & \texttt{2} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Figure 2: Input parameters}
+\label{tab:fig2_input}
+\begin{tabular}{lll}
+\toprule
+\textbf{Variable} & \textbf{Description} & \textbf{Value} \\
+\midrule
+\texttt{num\_days} & Days of experience & \texttt{500} \\
+\texttt{day\_length} & Timesteps per day & \texttt{80} \\
+\texttt{mean\_duration} & Mean episode duration & \texttt{5} \\
+\texttt{num\_swaps} & Corruption (on-off swaps) & \texttt{[B1: 0, C: 4, D: 10, F: \{0,2,\dots,16\}]} \\
+\texttt{latent.num} & Number of latent variables & \texttt{2} \\
+\texttt{latent.total\_sizes} & Size per latent subspace & \texttt{[50, 50]} \\
+\texttt{latent.act\_sizes} & Active per latent (K-hot) & \texttt{[10, 10]} \\
+\texttt{latent.dims} & Categories per latent & \texttt{[5, 5]} \\
+\texttt{latent.prob\_list} & Joint label distribution & $P(A{=}i,B{=}j){=}0.1$ if $i{=}j$, else $0.025$ \\
+\texttt{seeds} (F) & Random seeds for sweep & \texttt{[0,1,\dots,9]} (\texttt{num\_seeds}=10) \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{equation}
+where $|A|$ denotes the number of elements in set $A$.
+\paragraph{Mature and immature neurons} Neurons in the model can be either \textit{mature} or \textit{immature}. The intuition is: do these neurons contain meaningful representations via input received from another region (mature) or are mostly non-selective and random (immature)? More details on the dynamics and plasticity of mature and immature neurons can be seen below, but to summarize: (i) immature neurons have higher excitability during feed-forward input processing and (ii) immature neurons have a higher learning rate in its incoming feed-forward connections and its recurrent connections frozen. The intuition is that by having higher excitability, during receptive field formation in feed-forward synapses, immature neurons win the competition for postsynaptic activity only if the presynaptic pattern is too far from the receptive fields that have already formed. By doing this, if a presynaptic pattern is similar to previously formed representations, it slightly changes the already formed representations. If not, a set of immature neurons win the competition, develop receptive field due to higher plasticity, and then become mature. This allows one-shot formation of new postsynaptic representations of presynaptic input when an input pattern is too different from those presented to the network before, and then refining these representations with a slower learning rate. Similarly, recurrent connectivity, which reflects statistical regularities across the representations formed, is only developed between mature neurons that actually code for an environmental variable, to avoid recurrent connections representing spurious correlations. Maturity in a region is denoted by $\textrm{IM}^\textrm{region}$, where $\textrm{IM}^\textrm{region}_i = 1$ if neuron $i$ in the region is immature, and 0 otherwise.
+\subsection*{Network Operations}
+\subsubsection*{Neuronal activation}
+Synaptic input is mapped to neural activity via a \textit{K-winners-share-all} mechanism, in which the $K$ neurons with the highest pre-activation input $\hat{X}$ set their activity to 1, and the rest to 0. This can be written as
+\begin{equation}
+    X^\textrm{region} = \textrm{top-}K^\textrm{region}\big(\hat{X}^\textrm{region}\big)
+\end{equation}
+\subsubsection*{Feed-forward input processing}
+Input processing is computed for a single pre and post region at a time, with pre-activation input $\hat{X}^\textrm{post}$ obtained via
+\begin{equation}
+    \hat{X}^\textrm{post} = W^{\textrm{post}\leftarrow\textrm{pre}} \cdot X^\textrm{pre} + b^\textrm{post}\textrm{IM}^\textrm{post}
+\end{equation}
+$b^\textrm{post}$ is the extra excitability that immature neurons have in region post.
+\subsubsection*{Pattern completion (recurrent input processing)}
+Given a recurrent layer, pattern completion is defined as an iterative update on neural activity $X^\textrm{region}$ that is initiated in an initial state $X^\textrm{region}_0$:
+\begin{equation}
+    X^{\textrm{region}}_{k+1} = \textrm{top-}K(W^{\textrm{region}\leftarrow\textrm{region}}\cdot X^\textrm{region}_{k})
+\end{equation}
+with $W^{\textrm{region}\leftarrow\textrm{region}}$ the region recurrent connectivity matrix, $K$ dependent on the specified semantic load $S_L$, and $k$ a timestep operating on a smaller timescale,  than the overall timescale $t$. This means that within a timestep $t$, there are pattern\_complete\_iterations iterations on temporal index $k$.
+\subsubsection*{Hebbian Learning}
+The connection between a presynaptic neuron $j$ and a postsynaptic neuron $i$ subject to Hebbian learning is updated as:
+\begin{equation}
+            \Delta W_{ij} = \lambda_{ij}^{\textrm{post} \leftarrow \textrm{pre}}
+            X_i^\textrm{post} X_j^\textrm{pre}
+\end{equation}
+for a presynaptic region pre and a postsynaptic region post.
+\paragraph*{Maturity-dependent learning rate (feed-forward connections)}
+In order to combine one-shot and statistical learning in feed-forward synapses, the learning rate of feed-forward (post $\neq$ pre) connections depends on the \textit{maturity} of the postsynaptic neuron, which is given by $\textrm{IM}$. Neurons start in an \textit{immature} state $\textrm{IM}_i = 1$, allowing them to form relatively selective initial receptive fields. Once this initial receptive field is formed, the learning rate is reduced to capture the statistical regularities of the presynaptic patterns driving the postsynaptic neuron (the neuron is \textit{mature}, $\textrm{IM}_i = 0$). To do this, we define a quick learning rate
+\begin{equation}
+        \lambda^{\textrm{post}\leftarrow\textrm{pre}}_\textrm{quick} = \frac{W^{\textrm{post}\leftarrow\textrm{pre}}_\textrm{max-in}}{K^\textrm{pre}} 
+\end{equation}
+where again $W^{\textrm{post}\leftarrow\textrm{pre}}_\textrm{max-in}$ is a network parameter determining the maximum sum of incoming connections the matrix $W^{\textrm{post}\leftarrow\textrm{pre}}$ has for every postsynaptic neuron ($\sum_jW^{\textrm{post}\leftarrow\textrm{pre}}_{ij} \leq W^{\textrm{post}\leftarrow\textrm{pre}}_\textrm{max-in}$). Then, at each Hebbian update, we have
+\begin{equation}
+    \lambda_{ij}^{\textrm{post} \leftarrow \textrm{pre}} = (1 - \textrm{IM}^\textrm{post}_i)\lambda^{\textrm{post} \leftarrow \textrm{pre}}_\textrm{slow} + \textrm{IM}^\textrm{post}_i\lambda^{\textrm{post}\leftarrow\textrm{pre}}_\textrm{quick}
+\end{equation}
+where $\lambda^{\textrm{post} \leftarrow \textrm{pre}}_\textrm{slow}$ is a network parameter indicating the slow learning rate (used throughout all simulations except for the first receptive field formed at each postsynaptic neuron). Note how for an initial (before maturity) driving presynaptic pattern $X^\textrm{pre}$ this guaranties that the initial receptive field formed is $X^\textrm{pre}$ scaled such that the sum of incoming connections is exactly equal to $W^{\textrm{post}\leftarrow\textrm{pre}}_\textrm{max-in}$, as the $K$-winners-share-all mechanism imposes exactly $K^\textrm{pre}$ active neurons.
+\subsubsection*{Homeostatic Plasticity}
+We use multiplicative normalization that guarantees, for every weight matrix $W^{\textrm{post}\leftarrow\textrm{pre}}$, the total sum of incoming or outgoing connections is capped to a certain value. We define \textit{incoming homeostasis} as:
+\begin{equation}
+W_{ij}^{k+1}=
+\begin{cases}
+ W_{ij}^{k}\cdot\frac{W_\textrm{max-in}}{\sum_{j}W^{k}_{ij}} & \text{if }\sum_{j}W^{k}_{ij} = W_\textrm{max}^\textrm{in} + \epsilon_i, \;\; \epsilon_i > 0 \\[1.2ex]
+W^k_{ij}& \textrm{else}
+\end{cases}
+\label{incoming_homeostasis}
+\end{equation}
+where $W^k_{ij}$ denotes the value of synapse $ij$ before applying homeostasis and $W^{k+1}_{ij}$ the value after applying homeostasis (for readability, we simply write $W \equiv W^{\textrm{post}\leftarrow\textrm{pre}}$).
+Similarly, we have \textit{outgoing homeostasis} to be defined by:
+\begin{equation}
+W_{ij}^{k+1} =
+\begin{cases}
+ \frac{W_\textrm{max-out}}{\sum_{i}W^k_{ij}} & \text{if }\sum_{j}W^k_{ij} = W_\textrm{max}^\textrm{out} + \epsilon_j, \;\; \epsilon_j > 0 \\[1.2ex]
+0 & \textrm{else}
+\end{cases}
+\label{eq:outgoing_homeostasis}
+\end{equation}
+\subsubsection*{Replay}
+We define \textrm{Replay} as a learning mechanism involving a pre and a post region, such that $W^{\textrm{post}\leftarrow\textrm{pre}}$ extract statistical structure from $W^{\textrm{pre}\leftarrow\textrm{pre}}$ connections. A replay operation takes as argument a specific semantic load $S_L$, which determines the conceptual complexity of the extracted regularities. To do this, we first pattern complete an initial presynaptic pattern $X^\textrm{pre}_0$, defined as the square of a Gaussian random vector of the same size as the pre region:
+\begin{equation}
+    Z_0^\textrm{pre} \sim \mathcal{N}(0, I_{N^\textrm{pre}})
+\end{equation}
+\begin{equation}
+    X^\textrm{pre}_{0, i} = (Z^\textrm{pre}_i)^2
+\end{equation}
+where $N^\textrm{pre}$ is the size of region pre and $\mathcal{N}(0, I_{N^\textrm{pre}})$ is a multivariate Gaussian distribution with 0 mean and identity covariance (squaring guarantees neurons with more recurrent connectivity receive more input during the first pattern completion step). This initial random pattern is pattern completed to obtain $X^\textrm{pre}$, and then projected to the post region, to give $X^\textrm{post}$, using in both operations the same fixed semantic load. Then, Hebbian and homeostatic plasticity from post to pre region follow.
+\clearpage
+\subsection*{Data Analysis}
+\subsubsection*{Neuronal Selectivity}
+Given a vector $X$ that contains neuronal activity across T timesteps -with dimensions $(T, N^\textrm{neurons})$- and one that contains certain latent variables $Z$ -with dimensions  $(T, N^\textrm{latents})$, we do obtain the normalized values:
+\begin{equation}
+    X_\textrm{norm} = \frac{X - \langle X \rangle_{\textrm{time}}}{\sqrt{\langle X^2 \rangle_\textrm{time} - \langle X \rangle_\textrm{time}^2}} \;\; ; \;\; Z_\textrm{norm} = \frac{Z - \langle Z \rangle_{\textrm{time}}}{\sqrt{\langle Z^2 \rangle_\textrm{time} - \langle Z \rangle_\textrm{time}^2}}
+\end{equation} 
+And then obtain the matrix 
+\begin{equation}
+    S = \frac{1}{T}X_\textrm{norm}^TZ_\textrm{norm}
+\end{equation}
+which, for neuron $i$ and latent $j$ contains their correlation as:
+\begin{equation}
+    S(i, j) = \frac{1}{T}\sum_t X_{ti}Z_{tj}
+\end{equation}
+The Maximum Selectivity of neuron $i$ is the maximum selectivity value of neuron $i$ across all latents $j$:
+\begin{equation}
+    S_\textrm{max}(i) = \max_{j}{S(i, j)}
+\end{equation}
+\subsection*{Recall and replay}
+In Fig. \ref{fig:experimental_support_2} we obtain two measures related to the episodic memories formed in MTL$\leftarrow$MTL connections: \textit{recall} and \textit{replay}. In both cases we have a training phase, where multiple episodes are sampled as usual, and all of which are stored in MTL recurrent connections following \textit{wake} (Algorithm \ref{alg:wake}). Then there is a test phase. For \textit{recall}, we (1) randomly sample the neural activity of MTL-sensory for one of the episodes presented during training, (2) impose that activity and leave MTL-semantic random, and finally obtain $X^\textrm{MTL}_\textrm{P.Completed}$ via the \textit{Pattern Complete} operation (Algorithm \ref{alg:pattern_complete}). Recall is defined as the cosine similarity between the encoded and the recovered representation. Where indicated in a legend as MTL-sensory or MTL-semantic, that means the cosine similarity measured only in that subregion (but the previeous procedure is maintained the same). To measure  replay, we simply follow Algorithm (\ref{alg:replay}), which means doing pattern completion on a random initial activity pattern. Then, we measure the cosine similarity of MTL-sensory with each of the different prototypes (Eq. \eqref{eq:prototype}), and obtain the highest score across all prototypes. Intuitively, because there was no original pattern presented, and because we are interested in measuring replay as an initial generalization step, we measure how well do replayed activity patterns reflect latent prototypes (as these patterns are the ones that will be used to form semantic representations in CTX).
+\section*{Episode Generation Protocol}
+The Episode Generation Protocol (EGP) is a generative process that samples neuronal activity in the sensory layer. Our proposed EGP is defined as follows:
+\subsection*{Episodes, episode attributes and episode elements}
+All \textit{episodes} share a structure, such that every episode contains one \textit{episode element} per \textit{episode attribute}. This means that, given a collection of episode attributes $A, B, C...$, with each episode attribute representing a set of episode elements $a\in A, b\in B, c\in C$, then the set of all possible episodes is defined as:
+\begin{equation}
+    E = \left\{ \{a, b, c, \dots\} \mid a \in A, b \in B, c \in C, \dots \right\}
+\end{equation}
+In other words, an episode $e\in E$ is a collection of episode elements $a$, $b$, $c$, ... such that element $a$ belongs to episode attribute  $A$, element $b$ belongs to episode attribute $B$, etc.
+\newline\newline
+In this study, for illustrative purposes, we take a Pavlovian conditioning paradigm where there are two episode attributes: a Conditioned Stimulus (CS) and an Unconditioned Stimulus (US). Thus, episodes are specified by choosing $cs \in \textrm{CS}$ and $us \in \textrm{US}$, resulting in episodes of the form $\{cs, us\}$ (a CS is presented jointly with a US).
+\subsection*{Episode Probability Distribution}
+As a generative process, our EGP samples episodes as a previous step to sampling sensory input. We do this by fixing a probability distribution over episodes. For example, in the case where there are 2 two possible conditioned stimuli $cs_1, cs_2$ and 2 possible unconditioned stimuli $us_1, us_2$, one has to fix
+\begin{equation}
+    P(e = \{cs_1, us_1\}) \;\;, \;\; P(e = \{cs_1, us_2\}) \;\;, \;\; P(e = \{cs_2, us_1\})\;\;, \;\; P(e = \{cs_2, us_2\})
+\end{equation}
+such that
+\begin{equation}
+    0 \leq P(e = \{cs_i, us_j\}) \leq 1  \;\;,\;\; \sum_{i, j}P(e = \{cs_i, us_j\}) = 1 
+\end{equation}
+\subsection*{Episode-Input Mapping}
+Ultimately, the EGP samples sensory layer activity. For this reason, one also has to define how a sampled episode is mapped into sensory input. In this work, we use one of the simplest mappings, where the sensory layer activity depends on what are the elements present in the episode. This is, every element $a$ in attribute $A$ has a set of associated neurons $\textrm{SEN}_a$ in $\vec{x}_\textrm{SEN}$ such that, given an episode $e$
+\[     \vec{\tilde{x}}_\textrm{SEN}(i) = \begin{cases} 
+      1 & \textrm{if} \;\; i \in \textrm{SEN}_a \;\;\textrm{and}\;\; a \in e\\ 
+      0 & \textrm{else} \\
+   \end{cases}
+\]
+To account for variability between different presentations of the same episode (not all episodes, even though they contain the same elements, will be exactly the same), we further add some stochasticity by randomly picking $N^\textrm{swap}/2$ inactive neurons and $N^\textrm{swap}/2$ active neurons and inverting their activity (a total of $N^\textrm{swap}$ neurons randomly change their activity). This ensures that activity sparsity in the sensory layer is maintained (the number of swaps from 0 to 1 is the same as the number of swaps from 1 to 0).
+\subsection*{Semantic Structure of an EGP}
+We refer to  \textit{semantic field theory} \shortcite{bussmann_2006} in order to define what is the \textit{semantic structure} of an EGP. According to this school, the meaning of a word is not isolated but dependent on its relation to the rest of the words. While our task is not one of language, we can use this same paradigm to define the \textit{meaning} of episode elements. In this sense, the meaning of our episode elements depends on how they are related to the rest. Intuitively, even if a house is exactly the same for two dogs, the meaning of that house for each will be very different if it is always presented with food to one dog and always presented with an annoying whistle to the other.
+\newline\newline
+In this light, we use the conditional probabilities of being present in an episode between episode elements as a proxy for the semantic structure of an EGP:
+\begin{equation}
+    P(y \in e | x \in e) \;\; \forall x, y \in A\cup B\cup C\cup ...
+\end{equation}
+In other words, extracting the semantics of an EGP is equivalent to extracting how likely is one episode element $y$ to be present in an episode $e$ if an episode element $x$ is also present. From this definition follows that
+\begin{equation}
+    x = y \Longleftrightarrow P(y \in e | x \in e) = P(x \in e | y \in e) = 1
+\end{equation}
+That is, identity in the episode element space is completely specified by the conditional probability structure (two elements are the same if both their conditional likelihoods are 1).
+\subsubsection*{Signal to Noise Ratio}
+In order to obtain the Signal to Noise Ratio (SNR) of a generated pattern, we first define the signal as the expected overlap (number of common neurons) of the corrupted pattern with the original, and subtract the expected overlap between two randomly generated patterns of $K$ active neurons across $N$ neurons. 
+\begin{equation}
+    \textrm{E}\Big[|| X^\textrm{corrupted} \odot X^\textrm{original}||_0\Big] - \textrm{E}\Big[|| X^\textrm{random-1} \odot X^\textrm{random-2}||_0\Big]
+\end{equation}
+Because we fix that $N^\textrm{swaps}$ active (in the original pattern) flip from 1 to 0, the first term is always $K - N^\textrm{swaps}$, while the second corresponds to the expected value of a hypergeometric distribution, with expected value $K^2/N$. Then, we define the noise to be the number of non-common neurons between the corrupted and the original pattern, which is $2N^\textrm{swaps}$, giving:
+\begin{equation}
+    \mathrm{SNR} = \frac{K - N^\textrm{swaps}- K^2/N}{2N^\textrm{swaps}}
+\end{equation}
+\subsection*{Closed-form solutions to learning trajectories}
+Here, we obtain the learning dynamics of a weight $W_{ij}$. The intuition is very similar to that presented in \shortcite{rumelhart_1985}, which establishes the fixed points of a feed-forward network with incoming homeostasis, extending it to the full weight trajectories.
+\newline\newline
+We assume a post and a pre region (both could be the same in the case of a recurrent layer), but drop region indices unless necessary, yielding $W \equiv W^{\textrm{post}\leftarrow\textrm{pre}}$, $\lambda \equiv \lambda^{\textrm{post}\leftarrow\textrm{pre}}$. We similarly simplify the expressions for neuronal statistics as follows:
+\begin{equation}
+    p(i, j) \equiv p(X^\textrm{post}_i = 1 , X^\textrm{pre}_j = 1) \;\; ; \;\; p(i|j) \equiv p(X^\textrm{post}_i = 1 | X^\textrm{pre}_j = 1) \;\; ; \;\; p(j|i) \equiv p(X^\textrm{pre}_j = 1 | X^\textrm{post}_i = 1)
+\end{equation}
+Furthermore, we define the total outgoing (incoming) sum of $W$ in neuron $j$ ($i$) as at time $t$ as:
+    \begin{equation}
+    S^\textrm{out}_j(t) = \sum_i W_{ij} \;\; ; \;\; S^\textrm{in}_i(t) = \sum_j W_{ij}
+\end{equation}
+\subsubsection*{Only Hebbian learning}
+In the absence of homeostasis, in the case that there is outgoing homeostasis and $S^\textrm{out}_j(t) < W_\textrm{max-out}$, or in the case that there is incoming homeostasis and $S^\textrm{in}_i(t) < W_\textrm{max-in}$, synapse $ij$ is only subject to Hebbian learning. The mean trajectory of $W_{ij}$, can be trivially obtained assuming an initial condition $W_{ij}^0$:
+\begin{equation}
+    \langle W_{ij}(t)\rangle = W_{ij}^0 + \lambda p(i, j) t
+    \label{eq:hebbian_mean}
+\end{equation}
+given the only source of plasticity is Hebbian ($\Delta W_{ij} = \lambda X^\textrm{post}_iX^\textrm{pre}_j$) and, on average, this update will be applied in a fraction $p(i, j)$ of the time. 
+\subsubsection*{Outgoing homeostasis}
+Now, let's consider the case where at $t = 0$, $W_{ij} = W^0_{ij}$, and $S^\textrm{out}_j(t) = W_\textrm{max-out}$, in the presence of outgoing homeostatic plasticity. As, in any case, the only source of potentiation is Hebbian learning, the condition  $S_j(t) > W_\textrm{max-out}$ can only be met up upon future firing of neuron $j$. When that happens, according to Eq. \eqref{eq:outgoing_homeostasis}, we have
+\begin{equation}
+    S^\textrm{out}_j(t) >W_\textrm{max-out} \Longrightarrow W_{ij}(t+\delta) = W_{ij}(t) \frac{W_\textrm{max-out}}{S^\textrm{out}_j(t)} \Longleftrightarrow  \Delta W_{ij}(t) = W_{ij}(t)\Big[\frac{W_\textrm{max-out}}{S^\textrm{out}_j(t)} - 1\Big]
+    \label{eq:delta_out}
+\end{equation}
+where $W_{ij}(t + \delta)$ indicates the value after homeostasis, which we assume to be instantaneous (in simulations happens within the same simulation timestep). 
+\newline\newline
+Eq. \eqref{eq:delta_out} can be expanded by rewriting $S_j^\textrm{out}$ = $W_\textrm{max-out} + \epsilon^\textrm{out}_j$ ($\epsilon_j^\textrm{out}$ is guaranteed to be positive because $S_j^\textrm{out} > W_\textrm{max-out}$) and then using $\frac{1}{1 + \epsilon} \approx 1 - \epsilon$ for small $\epsilon$:
+\begin{equation}
+    \Delta W_{ij}(t) = W_{ij}(t)\Big[\frac{1}{1 + \epsilon^\textrm{pre}/W_\textrm{max-out}} - 1\Big] = - W_{ij}(t)\frac{\epsilon^\textrm{out}_j}{W_\textrm{max-out}} = -W_{ij}(t)\frac{\lambda K^\textrm{post}}{W_\textrm{max-out}}
+\end{equation}
+$\epsilon_j^\textrm{out}$ is a known quantity, given that outgoing homeostasis guarantees that before the last Hebbian update $S^\textrm{out}_j(t) = W_\textrm{max-out}$, and given 
+that at every timestep there are $K^\textrm{post}$ active neurons, so the total amount of extra outgoing connectivity in $j$ is $\lambda K^\textrm{post}$ upon neuron $j$ firing.
+\newline\newline
+Therefore, the mean update in synapse $ij$ depends on the probability of pre-post coincidence (Hebbian update) and the probability of presynaptic neuron $j$ firing:
+\begin{equation}
+    \Big\langle \frac{dW_{ij}(t)}{dt} \Big\rangle = \lambda p(i, j) -W_{ij}(t)\frac{\lambda K^\textrm{post}}{W_\textrm{max-out}}p(j)
+\end{equation}
+\newline\newline
+which can be interpreted as $W_{ij}$ low-pass filtering conditional firing probabilities:
+ \begin{equation}
+     \frac{dW_{ij}}{dt} = -\frac{1}{\tau_W^\textrm{out}}\Big(W_{ij}  - W_{ij}^\textrm{out}(\infty)\Big)
+ \end{equation}
+ with
+ \begin{equation}
+     \tau^\textrm{out}_W \equiv  \frac{W_\textrm{max-out}}{\lambda K^\textrm{post}p(j)}  \;\; ; \;\;\  W_{ij}^\textrm{out}(\infty) \equiv \frac{W_\textrm{max-out}}{K^\textrm{post}p(j)}p(i, j) \propto p(i|j)
+ \end{equation}
+\newline\newline
+For completion, we re-write the previous expressions without notation simplification:
+ \begin{equation}
+     \frac{dW_{ij}^{\textrm{pre}\leftarrow\textrm{post}}}{dt} = -\frac{1}{\tau_W^\textrm{out}}\Big(W_{ij}^{\textrm{pre}\leftarrow\textrm{post}}  - W_{ij}^{\textrm{pre}\leftarrow\textrm{post} ,\; \textrm{out}}(\infty)\Big)
+ \end{equation}
+  \begin{equation}
+     \tau^\textrm{out}_W \equiv  \frac{W_\textrm{max-out}^{\textrm{pre}\leftarrow\textrm{post}}}{\lambda^{\textrm{pre}\leftarrow\textrm{post}} K^\textrm{post}p(X_j^\textrm{pre} = 1)}  \;\; ; \;\;\  W_{ij}^{\textrm{pre}\leftarrow\textrm{post}, \; \textrm{out}}(\infty) \equiv \frac{W_\textrm{max-out}^{\textrm{pre}\leftarrow\textrm{post}}}{K^\textrm{post}}p(X^\textrm{post}_i = 1| X^\textrm{pre}_j = 1)
+ \end{equation}
+ 
+\bibliography{Cites.bib}
+\end{document}
