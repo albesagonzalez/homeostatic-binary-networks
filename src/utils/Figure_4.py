@@ -101,11 +101,8 @@ def figure4_accuracy(
 
     input, input_episodes, in_latents = make_input(**input_params)
 
-    print_rate = 50
     with torch.no_grad():
         for day in range(input_params["num_days"]):
-            if day%print_rate == 0:
-                print(day)
             net(input[day], debug=False)
 
     # Extract recordings for eval_region (only awake timesteps were executed)
@@ -124,12 +121,11 @@ def figure4_accuracy(
 
     # Selectivity from data, then latent accuracy
     selectivity = get_selectivity(X_output, X_episodes)
-    acc = get_latent_accuracy(X_output, selectivity, X_episodes.flatten(end_dim=1))
+    max_selectivity = selectivity.max(axis=1)[0]
 
-    aux = {"X": X_output, "labels": X_episodes, "selectivity": selectivity}
+    aux = {"X": X_output, "labels": X_episodes, "max_selectivity": max_selectivity}
     
-    return (acc, aux) if get_aux_results else acc
-
+    return (max_selectivity, aux) if get_aux_results else max_selectivity
 
 __all__ = [
     "figure4_accuracy",
