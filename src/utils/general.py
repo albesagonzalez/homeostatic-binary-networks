@@ -62,7 +62,6 @@ def make_input(num_days, day_length, mean_duration, fixed_duration, num_swaps, l
   for day in range(num_days):
     day_timestep = 0
     while day_timestep < day_length:
-      #pattern_duration = pattern_duration if (day_timestep + pattern_duration <= day_length) else day_length - day_timestep
       pattern_duration = mean_duration if fixed_duration else int(torch.poisson(mean_duration*torch.ones(1))[0])
       if satellite:
         latent_index, pattern = latent_space.sample()
@@ -352,7 +351,6 @@ def get_cond_matrix(latent_space, weights, eta):
       if conditioned_sub != condition_sub:
         sim_cond_matrix[conditioned_sub_index][condition_sub_index] = np.mean(weights[conditioned_neuron_index][:, condition_neuron_index])
       else:
-        #sim_cond_matrix[conditioned_sub_index][condition_sub_index] = np.mean(weights[conditioned_neuron_index][:, condition_neuron_index][~np.eye(condition_neuron_index.shape[0], dtype=bool)])
         sim_cond_matrix[conditioned_sub_index][condition_sub_index] = np.mean(weights[conditioned_neuron_index][:, condition_neuron_index])
       if conditioned_latent != condition_latent:
         label = [0, 0]

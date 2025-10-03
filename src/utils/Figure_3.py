@@ -90,7 +90,7 @@ def figure3_recall(
 
     input_tensor, input_episodes, input_latents = make_input(**in_params, regions=net.hidden_subregions)
     X_input = input_tensor.flatten(end_dim=1)
-    recalls = torch.zeros(X_input.shape[1])
+    recalls = torch.zeros(X_input.shape[0])
 
     for t, X_input_t in enumerate(X_input):
         X_input_t_corrupted = get_sample_from_num_swaps(X_input_t, noise_level_recall)

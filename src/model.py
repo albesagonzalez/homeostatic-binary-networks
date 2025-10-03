@@ -7,15 +7,6 @@ from copy import deepcopy
 
 
 class SSCNetwork(nn.Module):
-    """
-    Abstract scaffold for a sparse, subregional cortical network.
-
-    This class preserves the general structure (lifecycle, utilities, and
-    generic plasticity/recording helpers) while leaving the concrete
-    architecture unspecified. Implement the forward/sleep passes and define
-    region activities/weights in a subclass or by extending this file.
-    """
-
     def __init__(self, net_params, rec_params, net_model):
         super().__init__()
         self.init_network(net_params, net_model)
@@ -27,11 +18,8 @@ class SSCNetwork(nn.Module):
     def activation(self, x, region, x_conditioned=None, subregion_index=None, sleep=False, sparsity=None):
         """
         Winner-take-most activation per subregion with optional conditioning.
-        Relies on attributes:
-          - `<region>_sparsity`, `<region>_sparsity_sleep`
-          - `<region>_subregions`
         """
-        # Add tiny noise to break ties deterministically
+        # Add tiny noise to break ties
         x = x + (1e-10 + torch.max(x) - torch.min(x)) / 100000 * torch.randn_like(x)
 
         if x_conditioned is not None:
@@ -64,10 +52,6 @@ class SSCNetwork(nn.Module):
         return x_prime, subregion_index
 
     def pattern_complete(self, region, h_0=None, h_conditioned=None, subregion_index=None, sleep=False, num_iterations=None, sparsity=None):
-        """
-        Generic iterative pattern completion: h <- activation(W h).
-        Relies on attribute `<region>_<region>` as the recurrent weight matrix.
-        """
         num_iterations = num_iterations if num_iterations is not None else getattr(self, region + '_pattern_complete_iterations')
         h = h_0 if h_0 is not None else getattr(self, region)
         w = getattr(self, region + '_' + region)
@@ -76,12 +60,6 @@ class SSCNetwork(nn.Module):
         return h
 
     def hebbian(self, post_region, pre_region):
-        """
-        Generic Hebbian update: W += lambda * (post ⊗ pre)
-        Expects attributes:
-          - `<post>_<pre>` weight matrix
-          - `<post>_<pre>_lmbda` learning rate (optional; defaults to 1.0)
-        """
         w_name = f"{post_region}_{pre_region}"
         if self._is_frozen(w_name):
             return
@@ -100,12 +78,6 @@ class SSCNetwork(nn.Module):
         setattr(self, w_name, w)
 
     def homeostasis(self, post_region, pre_region):
-        """
-        Caps total outgoing (row-wise) and incoming (col-wise) strength.
-        Expects optional attributes:
-          - `max_post_<post>_<pre>` and `max_pre_<post>_<pre>`
-        If not present, the corresponding constraint is skipped.
-        """
         w_name = f"{post_region}_{pre_region}"
         if self._is_frozen(w_name):
             return
@@ -139,7 +111,7 @@ class SSCNetwork(nn.Module):
     def replay(self, post_region, pre_region):
         #obtain presynaptic pattern from pattern completing noise
         pre_size = getattr(self, f"{pre_region}_size")
-        X_pre_0 = torch.randn(pre_size)**2
+        X_pre_0 = torch.randn(pre_size)
         X_pre = self.pattern_complete(pre_region, h_0=X_pre_0)
         #forard presyaptic pattern to post
         IM = getattr(self, f"{post_region}_IM")
@@ -159,13 +131,6 @@ class SSCNetwork(nn.Module):
 
     
     def _is_frozen(self, conn_name: str) -> bool:
-        """Return True if the given connection is frozen.
-
-        Supports legacy booleans:
-          - True: all connections frozen
-          - False/None: none frozen
-          - list/tuple/set: only listed names are frozen
-        """
         fr = getattr(self, 'frozen', [])
         if isinstance(fr, bool):
             return fr
@@ -241,7 +206,7 @@ class SSCNetwork(nn.Module):
 
                 # Initialize per-region immaturity mask (IM) and excitability (b)
                 # IM: 1 if region is immature, else 0 (vector of region size)
-                # b:  constant vector filled with provided bias value
+                # b:  constant vector filled with excitability
                 imm_key = f"{region}_immature"
                 b_key = f"{region}_b"
 
@@ -256,10 +221,6 @@ class SSCNetwork(nn.Module):
                 setattr(self, region + '_b', b_tensor)
 
         # Global state flags
-        # `frozen` may be provided as:
-        # - False/None: no connections frozen
-        # - True: all connections frozen (legacy behavior)
-        # - list/tuple/set of connection names (e.g., ["ctx_ctx", "mtl_mtl"]) to freeze selectively
         frozen_val = getattr(self, 'frozen', [])
         if frozen_val is None:
             frozen_val = []
@@ -282,11 +243,6 @@ class SSCNetwork(nn.Module):
                 self.init_connectivity(post_region, pre_region)
 
     def bind_network_model(self, model_map=None):
-        """Bind/refresh instance methods from a mapping of name → function.
-
-        If `model_map` is None, tries `self.network_model`.
-        Each callable is bound as a method on the instance under its key.
-        """
         if model_map is None:
             model_map = getattr(self, 'network_model', None)
         if isinstance(model_map, dict):
@@ -294,22 +250,9 @@ class SSCNetwork(nn.Module):
                 if callable(fn):
                     bound = types.MethodType(fn, self)
                     setattr(self, name, bound)
-                    # Keep an internal alias to avoid recursion and allow delegation
                     setattr(self, f"_{name}_fn", bound)
 
     def init_connectivity(self, post_region: str, pre_region: str):
-        """
-        Initialize a connectivity matrix for a given (post, pre) pair using
-        per-connection attributes:
-          - f"{post}_{pre}_init"            → initialization type (supports 'recurrent')
-          - f"{post}_{pre}_init_random"     → bool, enable random RF init
-          - f"{post}_{pre}_init_random_max" → 'post' or 'pre'
-          - f"{post}_{pre}_init_rf_size"    → int, number of RF connections
-          - f"{post}_{pre}_init_std"        → float, Gaussian noise std
-          - f"{post}_{pre}_init_max_post"   → float, total per-post cap (if random_max == 'post')
-          - f"{post}_{pre}_init_max_pre"    → float, total per-pre cap (if random_max == 'pre')
-        Stores tensor in attribute f"{post}_{pre}".
-        """
         conn = f"{post_region}_{pre_region}"
 
         # Resolve sizes
